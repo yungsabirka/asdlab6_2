@@ -1,0 +1,212 @@
+#include <iostream>
+#include "list.h"
+#include <cmath>
+#include <unordered_map>
+
+long long generateRandLong();
+
+bool testHashTable();
+
+struct HashTable {
+    int a = rand() % 30;
+    int b = rand() % 30;
+    int M = 10001;
+    int N_List = 0;
+    double MaxLoadFactor = 0.5;
+    int LoadFactor = 0;
+
+    HashNode *buketsArray = new HashNode[M];
+
+    long long hash(long long key, int divider) {
+        long long p = 131071;
+        long long hash_value = ((a * key + b) % p) % divider;
+        return hash_value;
+    }
+
+    long long doublehash(long long key, int divider) {
+        long long hash_value = 1 + key % 11;
+        return hash_value;
+    }
+
+    void refactor(int k) {
+        int mNew = M * k;
+        auto *temp = new HashNode[mNew];
+        for (int i = 0; i < M; ++i) {
+            if (buketsArray[i].key && buketsArray[i].key !=1) {
+                int square = 1;
+                long long NewIndex = hash(buketsArray[i].key, mNew);
+                if (!temp[NewIndex].key || temp[NewIndex].key == buketsArray[i].key) {
+                    temp[NewIndex].key = buketsArray[i].key;
+                    temp[NewIndex].Algorithm = buketsArray[i].Algorithm;
+                } else {
+                    long long number = doublehash(buketsArray[i].key, mNew);
+                    while (temp[NewIndex].key && temp[NewIndex].key != buketsArray[i].key) {
+                        NewIndex += number;
+                        square++;
+                    }
+                    temp[NewIndex].Algorithm = buketsArray[i].Algorithm;
+                    temp[NewIndex].key = buketsArray[i].key;
+                }
+            }
+        }
+        delete[] buketsArray;
+        buketsArray = temp;
+        M = mNew;
+    }
+
+    void insert(long long key, Data value) {
+        int square = 1;
+        LoadFactor = N_List / M;
+        if (LoadFactor >= MaxLoadFactor)
+            refactor(7);
+        long long index = hash(key, M);
+        if (!buketsArray[index].key || buketsArray[index].key == key || buketsArray[index].key == 1) {
+            if (buketsArray[index].key != key) N_List++;
+            buketsArray[index].Algorithm = value;
+            buketsArray[index].key = key;
+        } else {
+            long long number = doublehash(key, M);
+            while (buketsArray[index].key && buketsArray[index].key != key && buketsArray[index].key != 1) {
+                index += number;
+                square++;
+
+                if (index > M)
+                    refactor(7);
+            }
+            if (buketsArray[index].key != key) N_List++;
+            buketsArray[index].Algorithm = value;
+            buketsArray[index].key = key;
+        }
+    }
+
+    void erase(long long key) {
+        int square = 1;
+        long long index = hash(key, M);
+        long long number = doublehash(key, M);
+        while (buketsArray[index].key != key && buketsArray[index].key) {
+            index += number;
+            square++;
+        }
+        if (buketsArray[index].key) {
+            buketsArray[index].Algorithm = {};
+            buketsArray[index].key = 1;
+            N_List--;
+        } else return;
+    }
+
+    Data *find(long long key) {
+        int square = 1;
+        long long index = hash(key, M);
+        long long number = doublehash(key, M);
+        while (buketsArray[index].key != key && buketsArray[index].key) {
+            index += number;
+            square++;
+        }
+        if (buketsArray[index].key)
+            return &buketsArray[index].Algorithm;
+        else
+            return nullptr;
+    }
+
+    int size() {
+        return N_List;
+    }
+};
+
+int main() {
+    srand(time(0));
+    testHashTable();
+    return 0;
+}
+
+long long generateRandLong() {
+    long long key = 0;
+    int number = 10 + rand() % 3;
+    for (int i = 0; i < number - 1; i++)
+        key += (rand() % 9) * pow(10, i);
+    key += (rand() % 8 + 1) * pow(10, number - 1);
+    return key;
+}
+
+bool testHashTable() {
+    const int iters = 200000;
+    const int keysAmount = iters * 1;
+
+    // generate random keys:
+    auto *keys = new long long[keysAmount];
+
+    auto *keysToInsert = new long long[iters];
+    auto *keysToErase = new long long[iters];
+    auto *keysToFind = new long long[iters];
+
+    for (int i = 0; i < keysAmount; i++) {
+        keys[i] = generateRandLong();
+    }
+    for (int i = 0; i < iters; i++) {
+        keysToInsert[i] = keys[generateRandLong() % keysAmount];
+        keysToErase[i] = keys[generateRandLong() % keysAmount];
+        keysToFind[i] = keys[generateRandLong() % keysAmount];
+    }
+
+    // test my HashTable:
+    HashTable hashTable;
+
+    clock_t myStart = clock();
+    for (int i = 0; i < iters; i++) {
+        hashTable.insert(keysToInsert[i], Data());
+    }
+    int myInsertSize = hashTable.size();
+    for (int i = 0; i < iters; i++) {
+        hashTable.erase(keysToErase[i]);
+    }
+    int myEraseSize = hashTable.size();
+    int myFoundAmount = 0;
+    for (int i = 0; i < iters; i++) {
+        if (hashTable.find(keysToFind[i]) != nullptr) {
+            myFoundAmount++;
+        }
+    }
+    clock_t myEnd = clock();
+    float myTime = (float(myEnd - myStart)) / CLOCKS_PER_SEC;
+
+    // test STL hash table:
+    unordered_map<long long, Data> unorderedMap;
+
+    clock_t stlStart = clock();
+    for (int i = 0; i < iters; i++) {
+        unorderedMap.insert({keysToInsert[i], Data()});
+    }
+    long long stlInsertSize = unorderedMap.size();
+    for (int i = 0; i < iters; i++) {
+        unorderedMap.erase(keysToErase[i]);
+    }
+    long long stlEraseSize = unorderedMap.size();
+    int stlFoundAmount = 0;
+    for (int i = 0; i < iters; i++) {
+        if (unorderedMap.find(keysToFind[i]) != unorderedMap.end()) {
+            stlFoundAmount++;
+        }
+    }
+    clock_t stlEnd = clock();
+    float stlTime = (float(stlEnd - stlStart)) / CLOCKS_PER_SEC;
+    cout << "My HashTable:" << endl;
+    cout << "Time: " << myTime << ", size: " << myInsertSize << " - " << myEraseSize << ", found amount: "
+         << myFoundAmount << endl;
+    cout << "STL unordered_map:" << endl;
+    cout << "Time: " << stlTime << ", size: " << stlInsertSize << " - " << stlEraseSize << ", found amount: "
+         << stlFoundAmount << endl << endl;
+    delete[] keys;
+    delete[] keysToInsert;
+    delete[] keysToErase;
+    delete[] keysToFind;
+
+    if (myInsertSize == stlInsertSize && myEraseSize == stlEraseSize && myFoundAmount == stlFoundAmount) {
+        cout << "The lab is completed" << endl;
+        return true;
+    }
+    hashTable.size();
+    cerr << ":(" << endl;
+    return false;
+}
+
+
